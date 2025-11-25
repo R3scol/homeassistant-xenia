@@ -1,0 +1,18 @@
+cards:
+  - type: entities
+    title: Xenia Übersicht
+    entities:
+      - entity: switch.xenia_power
+        name: Power
+      - entity: switch.xenia_eco_mode
+        name: Eco Mode
+      - entity: switch.xenia_steam_mode
+        name: Steam Mode
+  - type: entities
+    title: Xenia Sensoren
+    entities:
+      - entity: sensor.xenia_brew_group_temp
+      - entity: sensor.xenia_brewgroup_set_temp
+      - entity: sensor.xenia_boiler_temp
+      - entity: sensor.xenia_pump_pressure
+      - entity: sensor.xenia_steam_pressure

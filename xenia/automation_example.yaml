@@ -1,0 +1,21 @@
+alias: 'Xenia: Notify when brewgroup ready'
+description: ''
+trigger:
+  - platform: state
+    entity_id: sensor.xenia_status
+    to: '1'
+action:
+  - wait_for_trigger:
+      - platform: numeric_state
+        entity_id: sensor.xenia_brew_group_temp
+        above: "{{ states('sensor.xenia_brewgroup_set_temp') | float }}"
+    timeout: '00:10:00'
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ states('sensor.xenia_status') != '0' }}"
+        sequence:
+          - service: notify.TODO_MOBILE_APP
+            data:
+              title: 'Xenia'
+              message: 'Brühgruppe hat Solltemperatur erreicht.'
