@@ -1,0 +1,15 @@
+send_action:
+  name: Xenia API Action
+  description: Sende einen Roh-Action-Code an /machine/control.
+  fields:
+    action:
+      description: Action-Code (uint8, laut Xenia-API)
+      example: 2
+
+execute_script:
+  name: Xenia Script ausführen
+  description: Führt eines der Xenia-Skripte aus (Index laut /scripts/list).
+  fields:
+    index:
+      description: Script-Index (z. B. 13 für Full Pressure Profiling)
+      example: 13
