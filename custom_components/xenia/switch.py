@@ -1,82 +1,57 @@
+from __future__ import annotations
+
+from typing import Any, Dict
+
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-import asyncio
-from datetime import timedelta
-from .api import XeniaAPI
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+from .const import DOMAIN
+from .coordinator import XeniaDataUpdateCoordinator
+from .api import XeniaApi
+
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    api = hass.data['xenia']['api']
-    coordinator = DataUpdateCoordinator(
-        hass,
-        _LOGGER:=hass.logger,
-        name="xenia",
-        update_interval=timedelta(seconds=10),
-        update_method=lambda: hass.async_add_executor_job(api.overview)
-    )
-    await coordinator.async_config_entry_first_refresh()
-    async_add_entities([
-        XeniaPowerSwitch(api, coordinator),
-        XeniaEcoSwitch(api, coordinator),
-        XeniaSteamSwitch(api, coordinator)
-    ], True)
+    data = hass.data[DOMAIN][entry.entry_id]
+    coordinator: XeniaDataUpdateCoordinator = data["coordinator"]
+    api: XeniaApi = data["api"]
 
-class BaseXeniaSwitch(SwitchEntity):
-    def __init__(self, api, coordinator):
+    entities: list[XeniaSwitch] = [
+        XeniaPowerSwitch(coordinator, api),
+        # Wenn du später Eco/Steam als Button/Switch willst, kann man hier mehr ergänzen
+    ]
+
+    async_add_entities(entities)
+
+
+class XeniaSwitch(CoordinatorEntity, SwitchEntity):
+    """Basis-Klasse für Xenia-Switches."""
+
+    def __init__(self, coordinator: XeniaDataUpdateCoordinator, api: XeniaApi) -> None:
+        super().__init__(coordinator)
         self._api = api
-        self._coordinator = coordinator
-
-    async def async_update(self):
-        await self._coordinator.async_request_refresh()
-        data = self._coordinator.data
-
-class XeniaPowerSwitch(BaseXeniaSwitch):
-    def __init__(self, api, coordinator):
-        super().__init__(api, coordinator)
-        self._is_on = False
 
     @property
-    def name(self):
+    def available(self) -> bool:
+        return self.coordinator.last_update_success
+
+
+class XeniaPowerSwitch(XeniaSwitch):
+    """Ein/Aus-Schalter der Maschine."""
+
+    @property
+    def name(self) -> str:
         return "Xenia Power"
 
     @property
-    def is_on(self):
-        try:
-            return self._coordinator.data.get('MA_STATUS') == '1'
-        except Exception:
-            return self._is_on
+    def is_on(self) -> bool:
+        data: Dict[str, Any] = self.coordinator.data or {}
+        status = data.get("MA_STATUS")
+        return bool(int(status)) if status is not None else False
 
-    async def async_turn_on(self, **kwargs):
-        await hass.async_add_executor_job(self._api.power, 0)
-        self._is_on = True
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self.hass.async_add_executor_job(self._api.power_on)
+        await self.coordinator.async_request_refresh()
 
-    async def async_turn_off(self, **kwargs):
-        await hass.async_add_executor_job(self._api.power, 1)
-        self._is_on = False
-
-class XeniaEcoSwitch(BaseXeniaSwitch):
-    @property
-    def name(self):
-        return "Xenia Eco Mode"
-
-    @property
-    def is_on(self):
-        return self._coordinator.data.get('MA_MODE') == 'eco'
-
-    async def async_turn_on(self, **kwargs):
-        await hass.async_add_executor_job(self._api.power, 3)  # action 3 assumed for eco
-    async def async_turn_off(self, **kwargs):
-        await hass.async_add_executor_job(self._api.power, 4)  # action 4 assumed to leave eco
-
-class XeniaSteamSwitch(BaseXeniaSwitch):
-    @property
-    def name(self):
-        return "Xenia Steam Mode"
-
-    @property
-    def is_on(self):
-        return self._coordinator.data.get('STEAM') == '1'
-
-    async def async_turn_on(self, **kwargs):
-        await hass.async_add_executor_job(self._api.power, 5)  # assumed steam action
-    async def async_turn_off(self, **kwargs):
-        await hass.async_add_executor_job(self._api.power, 6)
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self.hass.async_add_executor_job(self._api.power_off)
+        await self.coordinator.async_request_refresh()
